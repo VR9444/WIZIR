@@ -8,7 +8,7 @@ from picamera2 import Picamera2
 SHM_FRAME_NAME = "wizir_frame"
 SHM_META_NAME  = "wizir_meta"
 
-W, H = 640, 480
+W, H = 320, 240
 FPS_TARGET = 120
 
 RUNNING = True

@@ -10,6 +10,7 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from multiprocessing import shared_memory
+from picamera2 import Picamera2
 
 SHM_FRAME_NAME = "wizir_frame"
 SHM_META_NAME  = "wizir_meta"
@@ -379,7 +380,16 @@ def FindLED(standalone = False):
             return
     else:
         # Must match writer config:
-        H, W = 480, 640
+        picam2 = Picamera2()
+        config = picam2.create_video_configuration(
+            main={"format": "RGB888", "size": (W, H)},
+            controls={"FrameRate": 120},
+            buffer_count=6,
+        )
+        picam2.configure(config)
+        picam2.start()
+
+        H, W = 240 , 320
         shm_frame, shm_meta, frame_shm, meta = attach_shm_single(H, W)
         last_frame_id = -1
 
@@ -407,23 +417,25 @@ def FindLED(standalone = False):
                 if not ret:
                     break
             else:
-                # writer running flag (meta[2]) — stop if writer stopped
-                if int(meta[2]) == 0:
-                    break
+                # # writer running flag (meta[2]) — stop if writer stopped
+                # if int(meta[2]) == 0:
+                #     break
 
-                fid0 = int(meta[0])
-                if fid0 == last_frame_id:
-                    time.sleep(0.001)
-                    continue
+                # fid0 = int(meta[0])
+                # if fid0 == last_frame_id:
+                #     time.sleep(0.001)
+                #     continue
 
-                local = frame_shm.copy()
+                # local = frame_shm.copy()
 
-                fid1 = int(meta[0])
-                if fid1 != fid0:
-                    continue  # writer updated during copy; retry
+                # fid1 = int(meta[0])
+                # if fid1 != fid0:
+                #     continue  # writer updated during copy; retry
 
-                frame = local
-                last_frame_id = fid1
+                # frame = local
+                # last_frame_id = fid1
+                rgb = picam2.capture_array("main")       # (H,W,3) RGB
+                bgr = rgb[:, :, ::-1]                    # OpenCV-friendly
 
 
             # FPS counter (processing)
