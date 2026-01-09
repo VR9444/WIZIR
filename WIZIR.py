@@ -16,6 +16,10 @@ from picamera2 import Picamera2
 # CONFIGURATION PARAMETERS
 
 STANDALONE = False
+VISUAL = False
+DELAY = False          # whether to delay between frames for visualization
+SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
+
 
 CamWidth, CamHeight = 512,288
 
@@ -56,8 +60,6 @@ ASSOC_DIST_PX = 100         # max distance for nearest-neighbour association
 MAX_MISSES = 12             # how many frames a track can go unseen before deletion
 MAX_TRACKS = 10             # safety cap for max number of simultaneous tracks
 
-DELAY = True          # whether to delay between frames for visualization
-SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
 
 # Probability thresholds for LED presence decision
 # 5 out of 12 frames = ~0.42
@@ -453,32 +455,34 @@ def FindLED(standalone):
 
             time_end = time.perf_counter()
             proc_time_ms = (time_end - time_start) * 1000.0
-            
-            # cv2.putText(
-            #     frame,
-            #     f"Proc time: {proc_time_ms:.1f} ms",
-            #     (10, 20),
-            #     cv2.FONT_HERSHEY_SIMPLEX,
-            #     0.6,
-            #     (0, 255, 0),
-            #     2,
-            # )
+
             time_historyms.append(proc_time_ms)
 
+            if VISUAL:
+                cv2.putText(
+                    frame,
+                    f"Proc time: {proc_time_ms:.1f} ms",
+                    (10, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 0),
+                    2,
+                )
 
-            # Visualize tracks on original
-            # vis = draw_tracks(frame, tracks, best)
-            # cleaned_bgr = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
 
-            # combined = np.hstack((vis, cleaned_bgr))  # top row
+                # Visualize tracks on original
+                vis = draw_tracks(frame, tracks, best)
+                cleaned_bgr = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
 
-            # plot_img = plot_to_img([ tr for tr in time_historyms],
-            #                     width=combined.shape[1],
-            #                     height=120,
-            #                     title="Track area")
+                combined = np.hstack((vis, cleaned_bgr))  # top row
 
-            # combined = np.vstack((combined, plot_img))
-            # cv2.imshow("Tracked | Cleaned Binary | Plot", combined)
+                plot_img = plot_to_img([ tr for tr in time_historyms],
+                                    width=combined.shape[1],
+                                    height=120,
+                                    title="Track area")
+
+                combined = np.vstack((combined, plot_img))
+                cv2.imshow("Tracked | Cleaned Binary | Plot", combined)
 
 
 
