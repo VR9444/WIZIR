@@ -15,9 +15,9 @@ from picamera2 import Picamera2
 
 # CONFIGURATION PARAMETERS
 
-STANDALONE = False
-VISUAL = False
-DELAY = False          # whether to delay between frames for visualization
+STANDALONE = False      #Standalone TRUE is no camera test
+VISUAL = True
+DELAY = False           # whether to delay between frames for visualization
 SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
 
 
@@ -462,15 +462,15 @@ def FindLED(standalone):
             time_historyms.append(proc_time_ms)
 
             if VISUAL:
-                cv2.putText(
-                    frame,
-                    f"Proc time: {proc_time_ms:.1f} ms",
-                    (10, 20),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0, 255, 0),
-                    2,
-                )
+                # cv2.putText(
+                #     frame,
+                #     f"Proc time: {proc_time_ms:.1f} ms",
+                #     (10, 20),
+                #     cv2.FONT_HERSHEY_SIMPLEX,
+                #     0.6,
+                #     (0, 255, 0),
+                #     2,
+                # )
 
 
                 # Visualize tracks on original
