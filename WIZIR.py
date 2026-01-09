@@ -12,11 +12,13 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from multiprocessing import shared_memory
 from picamera2 import Picamera2
 
-SHM_FRAME_NAME = "wizir_frame"
-SHM_META_NAME  = "wizir_meta"
-
 
 # CONFIGURATION PARAMETERS
+
+STANDALONE = False
+
+CamWidth, CamHeight = 512,288
+
 
 # Hard CUTOFF threshold for binary segmentation(from 0-255) 
 # Everything above this value is considered 1 (white), below is 0 (black)
@@ -62,15 +64,6 @@ SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
 # 7 out of 12 frames = ~0.58
 P_MIN = 5/12
 P_MAX = 7/12
-
-
-def attach_shm_single(H, W):
-    shm_frame = shared_memory.SharedMemory(name=SHM_FRAME_NAME, create=False)
-    shm_meta  = shared_memory.SharedMemory(name=SHM_META_NAME,  create=False)
-
-    frame = np.ndarray((H, W, 3), dtype=np.uint8, buffer=shm_frame.buf)
-    meta  = np.ndarray((4,), dtype=np.int64, buffer=shm_meta.buf)
-    return shm_frame, shm_meta, frame, meta
 
 
 
@@ -366,7 +359,7 @@ def plot_to_img(series, width, height=120, title="Track area"):
 
 
 
-def FindLED(standalone = False):
+def FindLED(standalone):
     cap = None
     shm_frame = shm_meta = None
     frame_shm = meta = None
@@ -382,16 +375,13 @@ def FindLED(standalone = False):
         # Must match writer config:
         picam2 = Picamera2()
         config = picam2.create_video_configuration(
-            main={"format": "RGB888", "size": (W, H)},
+            main={"format": "RGB888", "size": (CamWidth, CamHeight)},
             controls={"FrameRate": 120},
             buffer_count=6,
         )
         picam2.configure(config)
         picam2.start()
 
-        H, W = 240 , 320
-        shm_frame, shm_meta, frame_shm, meta = attach_shm_single(H, W)
-        last_frame_id = -1
 
     k_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (OPEN_K, OPEN_K))
     k_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (CLOSE_K, CLOSE_K))
@@ -417,23 +407,6 @@ def FindLED(standalone = False):
                 if not ret:
                     break
             else:
-                # # writer running flag (meta[2]) — stop if writer stopped
-                # if int(meta[2]) == 0:
-                #     break
-
-                # fid0 = int(meta[0])
-                # if fid0 == last_frame_id:
-                #     time.sleep(0.001)
-                #     continue
-
-                # local = frame_shm.copy()
-
-                # fid1 = int(meta[0])
-                # if fid1 != fid0:
-                #     continue  # writer updated during copy; retry
-
-                # frame = local
-                # last_frame_id = fid1
                 rgb = picam2.capture_array("main")       # (H,W,3) RGB
                 frame = rgb[:, :, ::-1]                    # OpenCV-friendly
 
@@ -481,23 +454,23 @@ def FindLED(standalone = False):
             time_end = time.perf_counter()
             proc_time_ms = (time_end - time_start) * 1000.0
             
-            cv2.putText(
-                frame,
-                f"Proc time: {proc_time_ms:.1f} ms",
-                (10, 20),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 255, 0),
-                2,
-            )
+            # cv2.putText(
+            #     frame,
+            #     f"Proc time: {proc_time_ms:.1f} ms",
+            #     (10, 20),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     0.6,
+            #     (0, 255, 0),
+            #     2,
+            # )
             time_historyms.append(proc_time_ms)
 
 
             # Visualize tracks on original
-            vis = draw_tracks(frame, tracks, best)
-            cleaned_bgr = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
+            # vis = draw_tracks(frame, tracks, best)
+            # cleaned_bgr = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
 
-            combined = np.hstack((vis, cleaned_bgr))  # top row
+            # combined = np.hstack((vis, cleaned_bgr))  # top row
 
             # plot_img = plot_to_img([ tr for tr in time_historyms],
             #                     width=combined.shape[1],
@@ -505,7 +478,7 @@ def FindLED(standalone = False):
             #                     title="Track area")
 
             # combined = np.vstack((combined, plot_img))
-            cv2.imshow("Tracked | Cleaned Binary | Plot", combined)
+            # cv2.imshow("Tracked | Cleaned Binary | Plot", combined)
 
 
 
@@ -532,7 +505,7 @@ def FindLED(standalone = False):
 
 
 def main():
-    FindLED(standalone=False)
+    FindLED(STANDALONE)
 
 if __name__ == "__main__":
     main()
