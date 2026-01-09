@@ -13,7 +13,7 @@ from multiprocessing import shared_memory
 
 
 
-STANDALONE = True      #Standalone TRUE is no camera test
+STANDALONE = False      #Standalone TRUE is no camera test
 
 
 if not STANDALONE:
@@ -22,13 +22,13 @@ if not STANDALONE:
 
 # CONFIGURATION PARAMETERS
 
-VISUAL = True
+VISUAL = False
 DELAY = False           # whether to delay between frames for visualization
 SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
-WRITE_TO_SHARE_MEMORY = False
+WRITE_TO_SHARE_MEMORY = True
 
 
-CamWidth, CamHeight = 512,288
+CamWidth, CamHeight = 512,140
 
 SHM_NAME = "WIZIR_RESULT"
 
@@ -440,7 +440,7 @@ def FindLED(standalone):
             if dt >= 1.0:
                 fps_value = fps_frames / dt
                 # temp = get_temp_c()
-                print(f"[detect] FPS={fps_value:.1f}  proc_ms(avg)={np.mean(time_historyms) if time_historyms else 0:.1f}")
+                # print(f"[detect] FPS={fps_value:.1f}  proc_ms(avg)={np.mean(time_historyms) if time_historyms else 0:.1f}")
                 fps_t0 = now
                 fps_frames = 0
 
