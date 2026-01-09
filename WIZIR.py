@@ -10,19 +10,28 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from multiprocessing import shared_memory
-from picamera2 import Picamera2
+
+
+
+STANDALONE = True      #Standalone TRUE is no camera test
+
+
+if not STANDALONE:
+    from picamera2 import Picamera2
 
 
 # CONFIGURATION PARAMETERS
 
-STANDALONE = False      #Standalone TRUE is no camera test
-VISUAL = False
+VISUAL = True
 DELAY = False           # whether to delay between frames for visualization
 SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
-WRITE_TO_SHARE_MEMORY = True
+WRITE_TO_SHARE_MEMORY = False
 
 
 CamWidth, CamHeight = 512,288
+
+SHM_NAME = "WIZIR_RESULT"
+
 
 
 # Hard CUTOFF threshold for binary segmentation(from 0-255) 
@@ -403,6 +412,14 @@ def FindLED(standalone):
     fps_frames = 0
     fps_value = 0.0
 
+    shm = None
+    res = None
+
+    if WRITE_TO_SHARE_MEMORY:
+        shm = shared_memory.SharedMemory(name=SHM_NAME, create=False)
+        res = np.ndarray((4,), dtype=np.float32, buffer=shm.buf)
+
+
 
     try:
         while True:
@@ -422,8 +439,8 @@ def FindLED(standalone):
             dt = now - fps_t0
             if dt >= 1.0:
                 fps_value = fps_frames / dt
-                temp = get_temp_c()
-                print(f"[detect] FPS={fps_value:.1f}  proc_ms(avg)={np.mean(time_historyms) if time_historyms else 0:.1f}, temp={temp:.1f}C")
+                # temp = get_temp_c()
+                print(f"[detect] FPS={fps_value:.1f}  proc_ms(avg)={np.mean(time_historyms) if time_historyms else 0:.1f}")
                 fps_t0 = now
                 fps_frames = 0
 
@@ -490,6 +507,19 @@ def FindLED(standalone):
 
 
 
+            if WRITE_TO_SHARE_MEMORY and res is not None:
+                if best is not None:
+                    res[0] = float(best["cx"])
+                    res[1] = float(best["cy"])
+                    res[2] = float(best["area"])
+                else:
+                    res[0] = -999.0
+                    res[1] = -999.0
+                    res[2] = -999.0
+
+                res[3] = float(fps_value)
+
+
             if DELAY:
                 delay_ms = int((1000.0 / FPS) * SLOW_FACTOR)
                 key = cv2.waitKey(delay_ms) & 0xFF
@@ -503,10 +533,10 @@ def FindLED(standalone):
     finally:
         if cap is not None:
             cap.release()
-        if shm_frame is not None:
-            shm_frame.close()
-        if shm_meta is not None:
-            shm_meta.close()
+
+        if WRITE_TO_SHARE_MEMORY and shm is not None:
+            shm.close()
+
         cv2.destroyAllWindows()
 
 
