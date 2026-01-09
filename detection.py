@@ -435,7 +435,7 @@ def FindLED(standalone = False):
                 # frame = local
                 # last_frame_id = fid1
                 rgb = picam2.capture_array("main")       # (H,W,3) RGB
-                bgr = rgb[:, :, ::-1]                    # OpenCV-friendly
+                frame = rgb[:, :, ::-1]                    # OpenCV-friendly
 
 
             # FPS counter (processing)
