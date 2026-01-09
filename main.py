@@ -7,6 +7,8 @@ import cv2
 import numpy as np
 from collections import deque
 import time
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 
 # CONFIGURATION PARAMETERS
@@ -319,6 +321,35 @@ def presence_bar(present_hist):
     string = "█" * countPresent + "·" * countMissing
     return string
 
+def plot_to_img(series, width, height=120, title="Track area"):
+    y = np.asarray(series, dtype=float)
+    if y.size == 0:
+        y = np.zeros(1, dtype=float)
+
+    dpi = 100
+    fig = plt.figure(figsize=(width / dpi, height / dpi), dpi=dpi)
+    canvas = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+
+    ax.plot(y, linewidth=2)
+    ax.set_title(title)
+    ax.grid(True)
+
+    fig.tight_layout(pad=0.2)
+    canvas.draw()
+
+    rgba = np.asarray(canvas.buffer_rgba(), dtype=np.uint8)  # (H, W, 4)
+    rgb = rgba[:, :, :3].copy()  # (H, W, 3)
+
+    plt.close(fig)
+
+    # HARD guarantee exact width (matplotlib can be off by a few px after tight_layout)
+    if rgb.shape[1] != width:
+        import cv2
+        rgb = cv2.resize(rgb, (width, rgb.shape[0]), interpolation=cv2.INTER_AREA)
+
+    return rgb
+
 # =========================
 # =========================
 
@@ -340,6 +371,7 @@ def main():
 
     # Active tracks
     tracks = []
+    time_historyms = deque(maxlen=20)
 
     try:
         while True:
@@ -389,11 +421,22 @@ def main():
                 (0, 255, 0),
                 2,
             )
+            time_historyms.append(proc_time_ms)
             # Visualize tracks on original
             vis = draw_tracks(frame, tracks, best)
+            cleaned_bgr = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
 
-            combined = np.hstack((vis, cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)))
-            cv2.imshow("Tracked | Cleaned Binary", combined)
+            combined = np.hstack((vis, cleaned_bgr))  # top row
+
+            plot_img = plot_to_img([ tr for tr in time_historyms],
+                                width=combined.shape[1],
+                                height=120,
+                                title="Track area")
+
+            combinedAll = np.vstack((combined, plot_img))
+            cv2.imshow("Tracked | Cleaned Binary | Plot", combinedAll)
+
+
 
             if DELAY:
                 delay_ms = int((1000.0 / FPS) * SLOW_FACTOR)
