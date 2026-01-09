@@ -42,6 +42,11 @@ def main():
 
     frame_id = 0
 
+    # FPS measurement
+    t0 = time.perf_counter()
+    frames_in_window = 0
+
+
     try:
         while RUNNING:
             rgb = picam2.capture_array("main")       # (H,W,3) RGB
@@ -55,6 +60,16 @@ def main():
             meta[0] = frame_id
             meta[1] = time.time_ns()
             meta[2] = 1
+
+            # FPS counter
+            frames_in_window += 1
+            now = time.perf_counter()
+            dt = now - t0
+            if dt >= 1.0:
+                fps = frames_in_window / dt
+                print(f"[capture] FPS={fps:.1f} (target={FPS_TARGET}) frame_id={frame_id}")
+                t0 = now
+                frames_in_window = 0
 
     finally:
         meta[2] = 0

@@ -393,6 +393,12 @@ def FindLED(standalone = False):
     tracks = []
     time_historyms = deque(maxlen=20)
 
+    # FPS measurement (processing rate)
+    fps_t0 = time.perf_counter()
+    fps_frames = 0
+    fps_value = 0.0
+
+
     try:
         while True:
             # ---- GET FRAME ----
@@ -419,6 +425,16 @@ def FindLED(standalone = False):
                 frame = local
                 last_frame_id = fid1
 
+
+            # FPS counter (processing)
+            fps_frames += 1
+            now = time.perf_counter()
+            dt = now - fps_t0
+            if dt >= 1.0:
+                fps_value = fps_frames / dt
+                print(f"[detect] FPS={fps_value:.1f}  proc_ms(avg)={np.mean(time_historyms) if time_historyms else 0:.1f}")
+                fps_t0 = now
+                fps_frames = 0
 
 
             time_start = time.perf_counter()
