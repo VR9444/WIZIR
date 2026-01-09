@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
-import os
 import sys
-from multiprocessing import shared_memory
-from multiprocessing import resource_tracker
+import time
+import signal
+import subprocess
 import numpy as np
+from multiprocessing import shared_memory
 
-SHM_NAME = "WIZIR_RESULT"     # ONLY ONE SHM
-SHM_SIZE = 4 * 4              # 4 float32 (cx, cy, area, fps)
+SHM_NAME = "WIZIR_RESULT"
+SHM_SIZE = 4 * 4   # 4 float32
 
-def safe_unlink(name: str):
+STOP = False
+def _sig(sig, frame):
+    global STOP
+    STOP = True
+
+signal.signal(signal.SIGINT, _sig)
+signal.signal(signal.SIGTERM, _sig)
+
+def safe_unlink(name):
     try:
         s = shared_memory.SharedMemory(name=name, create=False)
         s.close()
@@ -17,25 +26,39 @@ def safe_unlink(name: str):
         pass
 
 def main():
-    print("[orc] starting (execv mode)")
+    print("[orc] starting")
 
-    # Cleanup from previous crash
     safe_unlink(SHM_NAME)
 
-    # Create SHM
     shm = shared_memory.SharedMemory(name=SHM_NAME, create=True, size=SHM_SIZE)
-    arr = np.ndarray((4,), dtype=np.float32, buffer=shm.buf)
-    arr[:] = np.array([-999.0, -999.0, -999.0, 0.0], dtype=np.float32)
+    res = np.ndarray((4,), dtype=np.float32, buffer=shm.buf)
+    res[:] = [-999.0, -999.0, -999.0, 0.0]
 
-    # CRITICAL: stop Python's resource_tracker from auto-unlinking it on execv
-    # (Otherwise SHM disappears before WIZIR attaches)
-    resource_tracker.unregister(shm._name, "shared_memory")
+    print("[orc] starting WIZIR.py")
+    p = subprocess.Popen([sys.executable, "WIZIR.py"])
 
-    # Close our handle; SHM remains alive
-    shm.close()
+    try:
+        while not STOP:
+            cx, cy, area, fps = res.tolist()
+            print(f"[orc] cx={cx:.1f} cy={cy:.1f} area={area:.0f} fps={fps:.1f}")
+            time.sleep(1.0)
 
-    print("[orc] exec -> WIZIR.py")
-    os.execv(sys.executable, [sys.executable, "WIZIR.py"])
+            if p.poll() is not None:
+                print("[orc] WIZIR exited")
+                break
+    finally:
+        print("[orc] stopping")
+
+        if p.poll() is None:
+            p.terminate()
+            time.sleep(0.3)
+            if p.poll() is None:
+                p.kill()
+
+        shm.close()
+        shm.unlink()
+
+        print("[orc] done")
 
 if __name__ == "__main__":
     main()
