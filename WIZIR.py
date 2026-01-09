@@ -359,7 +359,9 @@ def plot_to_img(series, width, height=120, title="Track area"):
 
     return rgb
 
-
+def get_temp_c():
+    with open("/sys/class/thermal/thermal_zone0/temp") as f:
+        return int(f.read()) / 1000.0
 
 def FindLED(standalone):
     cap = None
@@ -419,7 +421,8 @@ def FindLED(standalone):
             dt = now - fps_t0
             if dt >= 1.0:
                 fps_value = fps_frames / dt
-                print(f"[detect] FPS={fps_value:.1f}  proc_ms(avg)={np.mean(time_historyms) if time_historyms else 0:.1f}")
+                temp = get_temp_c()
+                print(f"[detect] FPS={fps_value:.1f}  proc_ms(avg)={np.mean(time_historyms) if time_historyms else 0:.1f}, temp={temp:.1f}C")
                 fps_t0 = now
                 fps_frames = 0
 
