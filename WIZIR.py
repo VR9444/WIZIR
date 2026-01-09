@@ -16,9 +16,10 @@ from picamera2 import Picamera2
 # CONFIGURATION PARAMETERS
 
 STANDALONE = False      #Standalone TRUE is no camera test
-VISUAL = True
+VISUAL = False
 DELAY = False           # whether to delay between frames for visualization
 SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
+WRITE_TO_SHARE_MEMORY = True
 
 
 CamWidth, CamHeight = 512,288
