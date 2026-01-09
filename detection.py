@@ -9,6 +9,10 @@ from collections import deque
 import time
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from multiprocessing import shared_memory
+
+SHM_FRAME_NAME = "wizir_frame"
+SHM_META_NAME  = "wizir_meta"
 
 
 # CONFIGURATION PARAMETERS
@@ -57,6 +61,16 @@ SLOW_FACTOR = 1.0       # 2 = half speed, 4 = quarter speed, etc.
 # 7 out of 12 frames = ~0.58
 P_MIN = 5/12
 P_MAX = 7/12
+
+
+def attach_shm_single(H, W):
+    shm_frame = shared_memory.SharedMemory(name=SHM_FRAME_NAME, create=False)
+    shm_meta  = shared_memory.SharedMemory(name=SHM_META_NAME,  create=False)
+
+    frame = np.ndarray((H, W, 3), dtype=np.uint8, buffer=shm_frame.buf)
+    meta  = np.ndarray((4,), dtype=np.int64, buffer=shm_meta.buf)
+    return shm_frame, shm_meta, frame, meta
+
 
 
 # Processing functions
@@ -345,23 +359,29 @@ def plot_to_img(series, width, height=120, title="Track area"):
 
     # HARD guarantee exact width (matplotlib can be off by a few px after tight_layout)
     if rgb.shape[1] != width:
-        import cv2
         rgb = cv2.resize(rgb, (width, rgb.shape[0]), interpolation=cv2.INTER_AREA)
 
     return rgb
 
-# =========================
-# =========================
 
-# Main
-# =========================
-# =========================
-def main():
-    video_path = os.path.join("video", "video_120fps.h264")
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print(f"Error: Could not open video file at {video_path}")
-        return
+
+def FindLED(standalone = False):
+    cap = None
+    shm_frame = shm_meta = None
+    frame_shm = meta = None
+
+    # ---- SOURCE SELECT ----
+    if standalone:
+        video_path = os.path.join("video", "video_120fps.h264")
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            print(f"Error: Could not open video file at {video_path}")
+            return
+    else:
+        # Must match writer config:
+        H, W = 480, 640
+        shm_frame, shm_meta, frame_shm, meta = attach_shm_single(H, W)
+        last_frame_id = -1
 
     k_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (OPEN_K, OPEN_K))
     k_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (CLOSE_K, CLOSE_K))
@@ -375,12 +395,33 @@ def main():
 
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+            # ---- GET FRAME ----
+            if standalone:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+            else:
+                # writer running flag (meta[2]) — stop if writer stopped
+                if int(meta[2]) == 0:
+                    break
+
+                fid0 = int(meta[0])
+                if fid0 == last_frame_id:
+                    time.sleep(0.001)
+                    continue
+
+                local = frame_shm.copy()
+
+                fid1 = int(meta[0])
+                if fid1 != fid0:
+                    continue  # writer updated during copy; retry
+
+                frame = local
+                last_frame_id = fid1
+
+
 
             time_start = time.perf_counter()
-
 
             cleaned = preprocess_to_clean_binary(
                 frame_bgr=frame,
@@ -422,19 +463,21 @@ def main():
                 2,
             )
             time_historyms.append(proc_time_ms)
+
+
             # Visualize tracks on original
             vis = draw_tracks(frame, tracks, best)
             cleaned_bgr = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
 
             combined = np.hstack((vis, cleaned_bgr))  # top row
 
-            plot_img = plot_to_img([ tr for tr in time_historyms],
-                                width=combined.shape[1],
-                                height=120,
-                                title="Track area")
+            # plot_img = plot_to_img([ tr for tr in time_historyms],
+            #                     width=combined.shape[1],
+            #                     height=120,
+            #                     title="Track area")
 
-            combinedAll = np.vstack((combined, plot_img))
-            cv2.imshow("Tracked | Cleaned Binary | Plot", combinedAll)
+            # combined = np.vstack((combined, plot_img))
+            cv2.imshow("Tracked | Cleaned Binary | Plot", combined)
 
 
 
@@ -449,9 +492,19 @@ def main():
                 break
 
     finally:
-        cap.release()
+        if cap is not None:
+            cap.release()
+        if shm_frame is not None:
+            shm_frame.close()
+        if shm_meta is not None:
+            shm_meta.close()
         cv2.destroyAllWindows()
 
+
+
+
+def main():
+    FindLED(standalone=False)
 
 if __name__ == "__main__":
     main()
