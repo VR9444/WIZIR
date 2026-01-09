@@ -15,6 +15,8 @@ import time
 # Everything above this value is considered 1 (white), below is 0 (black)
 THRESHOLD = 230
 
+FPS = 120.0  # frames per second of input video
+
 # Morphological cleaning params
 # Opening removes small noise, closing fills small holes
 # OPEN_K defines the size of opening kernel(how meny pixels to make white)
@@ -125,7 +127,6 @@ def _dist2(a, b) -> float:
 def predict_track_position(tr):
     """
     Predict position misses+1 frames into the future using constant velocity.
-    vx,vy are pixels/frame. If no velocity known, falls back to last position.
     """
     vx = tr.get("vx", 0.0)
     vy = tr.get("vy", 0.0)
@@ -135,10 +136,6 @@ def predict_track_position(tr):
 def associate_nearest_neighbor(tracks, detections, max_dist_px: float):
     """
     Greedy NN assignment with a distance gate.
-    Returns:
-      matches: list of (track_idx, det_idx)
-      unmatched_tracks: set of track_idx
-      unmatched_dets: set of det_idx
     """
     max_d2 = max_dist_px * max_dist_px
 
@@ -248,7 +245,6 @@ def choose_best_track(tracks):
     return None
 
 def ensure_track_history(tr, history_len: int):
-    """Initialize per-track history deques if missing."""
     if "present_hist" not in tr:
         tr["present_hist"] = deque(maxlen=history_len)  # bools
     if "area_hist" not in tr:
@@ -321,7 +317,10 @@ def presence_bar(present_hist):
     return string
 
 # =========================
+# =========================
+
 # Main
+# =========================
 # =========================
 def main():
     video_path = os.path.join("video", "video_120fps.h264")
@@ -333,7 +332,7 @@ def main():
     k_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (OPEN_K, OPEN_K))
     k_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (CLOSE_K, CLOSE_K))
 
-    # Per-frame blob history: each entry is list[blob_dict]
+    # Per frame blob history
     blob_history = deque(maxlen=HISTORY_LEN)
 
     # Active tracks
@@ -393,12 +392,8 @@ def main():
             combined = np.hstack((vis, cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)))
             cv2.imshow("Tracked | Cleaned Binary", combined)
 
-
-
-            fps = 120.0
-
             if DELAY:
-                delay_ms = int((1000.0 / fps) * SLOW_FACTOR)
+                delay_ms = int((1000.0 / FPS) * SLOW_FACTOR)
                 key = cv2.waitKey(delay_ms) & 0xFF
             else:
                 key = cv2.waitKey(1) & 0xFF
