@@ -29,6 +29,8 @@ CLOSE_K = 3
 OPEN_ITERS = 3
 CLOSE_ITERS = 1
 
+MEDIAN_BLUR = False  # whether to apply median blur before thresholding
+
 # Blob filtering
 # if blob area is outside this range, it is ignored
 MIN_AREA = 50
@@ -66,7 +68,8 @@ def preprocess_to_clean_binary(
     close_iters: int,
 ) -> np.ndarray:
     gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-    gray = cv2.medianBlur(gray, 3)
+    if MEDIAN_BLUR:
+        gray = cv2.medianBlur(gray, 3)
 
     _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
 
